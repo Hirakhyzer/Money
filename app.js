@@ -55,15 +55,21 @@ function loadState() {
 }
 
 function isValidTransaction(transaction) {
+  if (typeof transaction?.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(transaction.date)) {
+    return false;
+  }
+  const date = new Date(`${transaction.date}T00:00:00Z`);
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== transaction.date) {
+    return false;
+  }
+
   return Boolean(
-    transaction &&
     typeof transaction.id === "string" &&
     ["income", "expense"].includes(transaction.type) &&
     Number.isFinite(Number(transaction.amount)) &&
     Number(transaction.amount) > 0 &&
     typeof transaction.description === "string" &&
-    typeof transaction.category === "string" &&
-    /^\d{4}-\d{2}-\d{2}$/.test(transaction.date)
+    typeof transaction.category === "string"
   );
 }
 
@@ -303,7 +309,11 @@ async function importData(event) {
       throw new Error("Invalid Money Map backup");
     }
 
-    const transactions = imported.transactions.filter(isValidTransaction).map((transaction) => ({
+    if (!imported.transactions.every(isValidTransaction)) {
+      throw new Error("The backup contains an invalid transaction.");
+    }
+
+    const transactions = imported.transactions.map((transaction) => ({
       ...transaction,
       amount: Number(transaction.amount),
       createdAt: Number(transaction.createdAt) || Date.now()
